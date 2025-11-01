@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>С днём рождения!</title>
+  <style>
+    :root{
+      --bg:#0f0f13;
+      --fg:#e9e9ee;
+      --muted:#b7b7c2;
+      --accent:#ff6fa9;
+      --accent-2:#ffc1d9;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, "Inter", Arial, sans-serif; background: radial-gradient(1200px 800px at 50% 20%, #1a1a22, var(--bg)); color:var(--fg); overflow-x:hidden}
+    .wrap{min-height:100vh; display:flex; flex-direction:column; align-items:center;}
+
+    /* Stage area */
+    .stage{position:relative; width:100%; height:60vh; max-height:720px; overflow:hidden}
+    canvas#petals{position:absolute; inset:0; width:100%; height:100%; display:block}
+
+    .title-overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none}
+    .fade-in{animation:fadeIn .9s ease forwards}
+    @keyframes fadeIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+    /* Prompt / input */
+    .panel{width:min(720px, 92vw); margin:24px auto 16px; padding:18px 20px; background:#16161d; border:1px solid #242433; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel h2{margin:0 0 10px; font-size:18px; font-weight:600; color:var(--fg)}
+    .panel p{margin:0 0 14px; color:var(--muted)}
+    .row{display:flex; gap:10px}
+    input[type="text"]{flex:1; padding:12px 14px; border-radius:12px; border:1px solid #2a2a3b; background:#0d0d12; color:var(--fg); font-size:16px}
+    input[type="text"]::placeholder{color:#6a6a79}
+    button{padding:12px 16px; border-radius:12px; border:1px solid #2a2a3b; background:linear-gradient(180deg, #1f1f29, #171720); color:var(--fg); cursor:pointer; font-weight:600}
+    button:hover{filter:brightness(1.1)}
+
+    .hint{margin-top:8px; font-size:13px; color:#8b8b98}
+
+    /* Second screen */
+    .screen{display:none; min-height:100vh; align-items:center; justify-content:center; padding:40px 20px}
+    .screen.active{display:flex}
+    .card{width:min(820px,95vw); background:#16161d; border:1px solid #242433; border-radius:18px; padding:36px; text-align:center; box-shadow:0 12px 36px rgba(0,0,0,.4)}
+    .card h1{font-size:28px; margin:0 0 10px}
+    .card p{font-size:18px; color:var(--muted)}
+
+    /* Audio button */
+    .audio-ctrl{position:fixed; right:16px; bottom:16px; display:flex; gap:10px}
+    .tag{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #2a2a3b; background:#14141b; color:#cfcfde; font-size:12px}
+    .dot{width:8px;height:8px;border-radius:50%;background:#e05a9b; box-shadow:0 0 10px #e05a9b88}
+
+    .foot{opacity:.6; font-size:12px; text-align:center; margin:20px 0 30px}
+    a{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stage" id="stage">
+      <canvas id="petals"></canvas>
+      <!-- Optional overlay text while forming -->
+      <div id="overlayText" class="title-overlay" aria-hidden="true"></div>
+    </div>
+
+    <div class="panel" id="panel" aria-live="polite">
+      <h2>напомни, кто отправил тебе это?</h2>
+      <p>Подсказка: это одна-единственная фраза, под которой он у тебя сохранён 🙂</p>
+      <form class="row" id="answerForm">
+        <input id="answer" type="text" placeholder="введи фразу" autocomplete="off" maxlength="64" />
+        <button type="submit" title="Проверить">Ок</button>
+      </form>
+      <div class="hint">Небольшой намёк: английский, три слова.</div>
+    </div>
+
+    <div class="foot">Сделано с любовью братом 💜</div>
+  </div>
+
+  <!-- Success screen -->
+  <section class="screen" id="screen2">
+    <div class="card fade-in">
+      <h1>Верно! 🎉</h1>
+      <p>Я просто хотел сказать, что ты всегда была светом, даже когда день пасмурный ❤️</p>
+      <div style="margin-top:18px">
+        <button id="restartBtn">Ещё раз</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Background music (provide your own lofi.mp3 or keep off) -->
+  <audio id="bgm" preload="auto" loop>
+    <!--
+      💿 Положи рядом с index.html файл lofi.mp3 (или укажи абсолютную ссылку на любимый трек),
+      например оттуда, где легально разрешено распространение.
+      Пример (замени src ниже):
+      <source src="https://cdn.pixabay.com/download/audio/2023/02/22/audio_6f4b6b.mp3?filename=lofi-study-140150.mp3" type="audio/mpeg" />
+    -->
+  </audio>
+
+  <div class="audio-ctrl">
+    <span class="tag" id="musicState"><span class="dot"></span> музыка: выкл</span>
+    <button id="musicBtn" title="Включить музыку">Включить музыку</button>
+  </div>
+
+  <script>
+  ;(() => {
+    const CANVAS = document.getElementById('petals');
+    const CTX = CANVAS.getContext('2d');
+    const OVERLAY = document.getElementById('overlayText');
+    const PANEL = document.getElementById('panel');
+    const SCREEN2 = document.getElementById('screen2');
+    const ANSWER = document.getElementById('answer');
+    const FORM = document.getElementById('answerForm');
+    const MUSIC_BTN = document.getElementById('musicBtn');
+    const MUSIC_STATE = document.getElementById('musicState');
+    const BGM = document.getElementById('bgm');
+    const RESTART = document.getElementById('restartBtn');
+
+    const TARGET_TEXT = 'С днём рождения!';
+    const stage = document.getElementById('stage');
+
+    // Resize canvas
+    function fit() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      CANVAS.width = Math.floor(stage.clientWidth * dpr);
+      CANVAS.height = Math.floor(stage.clientHeight * dpr);
+      CANVAS.style.width = stage.clientWidth + 'px';
+      CANVAS.style.height = stage.clientHeight + 'px';
+      CTX.setTransform(dpr, 0, 0, dpr, 0, 0);
+      buildTextTargets();
+    }
+    window.addEventListener('resize', fit);
+
+    // Particles (petals)
+    const petals = [];
+    const MAX = 1200; // cap to keep performance reasonable
+    const palette = [ '#ffd1e0', '#ffc2da', '#ffb3d4', '#ffa3cd', '#ff94c7', '#ff86c1' ];
+
+    function rand(a,b){return Math.random()*(b-a)+a}
+    function pick(arr){return arr[(Math.random()*arr.length)|0]}
+
+    function createPetal(yStart = rand(-stage.clientHeight, 0)){
+      const size = rand(6, 16);
+      return {
+        x: rand(0, stage.clientWidth),
+        y: yStart,
+        vx: rand(-0.4, 0.4),
+        vy: rand(0.6, 1.6),
+        wobble: rand(0, Math.PI*2),
+        wobbleSpeed: rand(0.01, 0.03),
+        rot: rand(0, Math.PI*2),
+        rotSpeed: rand(-0.02, 0.02),
+        size,
+        color: pick(palette),
+        target: null,
+        arriveT: 0
+      }
+    }
+
+    for (let i=0;i<Math.min(MAX, Math.ceil(stage.clientWidth*stage.clientHeight/1600));i++) {
+      petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
+    }
+
+    // Draw a single petal as a soft rotated teardrop/ellipse
+    function drawPetal(p) {
+      const s = p.size;
+      CTX.save();
+      CTX.translate(p.x, p.y);
+      CTX.rotate(p.rot + Math.sin(p.wobble)*0.2);
+      const grad = CTX.createRadialGradient(0, 0, 1, 0, 0, s);
+      grad.addColorStop(0, '#fff5f8');
+      grad.addColorStop(1, p.color);
+      CTX.fillStyle = grad;
+      CTX.beginPath();
+      // A simple leaf/petal-ish shape using bezier
+      CTX.moveTo(0, -s*0.2);
+      CTX.bezierCurveTo(s*0.9, -s*0.9,  s*0.9,  s*0.9, 0, s);
+      CTX.bezierCurveTo(-s*0.9,  s*0.9, -s*0.9, -s*0.9, 0, -s*0.2);
+      CTX.closePath();
+      CTX.fill();
+      CTX.restore();
+    }
+
+    // Text targets
+    let targets = [];
+    let forming = false;
+    let formed = false;
+
+    function buildTextTargets(){
+      // Build an offscreen canvas and sample alpha
+      const off = document.createElement('canvas');
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      off.width = w; off.height = h;
+      const c = off.getContext('2d');
+      const fontSize = Math.max(32, Math.min(120, Math.floor(w * 0.08)));
+      c.fillStyle = '#ffffff';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      c.shadowColor = 'rgba(255,255,255,0.2)';
+      c.shadowBlur = 0;
+      c.clearRect(0,0,w,h);
+      c.fillText(TARGET_TEXT, w/2, h/2);
+
+      const step = Math.max(3, Math.floor((w*h)/300000)); // density control
+      const img = c.getImageData(0,0,w,h).data;
+      targets = [];
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          const a = img[(y*w + x)*4 + 3];
+          if (a > 150) targets.push({x, y});
+        }
+      }
+      // shuffle to avoid obvious stripes
+      for (let i=targets.length-1;i>0;i--){
+        const j = (Math.random()* (i+1))|0; [targets[i], targets[j]] = [targets[j], targets[i]];
+      }
+    }
+
+    function assignTargets(){
+      const N = Math.min(petals.length, targets.length);
+      for (let i=0;i<N;i++){
+        const p = petals[i];
+        p.target = targets[i];
+        p.arriveT = 0;
+      }
+      forming = true;
+    }
+
+    // Animation loop
+    let last = performance.now();
+    function tick(t){
+      const dt = Math.min(32, t - last); last = t;
+      CTX.clearRect(0,0, stage.clientWidth, stage.clientHeight);
+
+      // Spawn extra petals over time until MAX
+      if (!forming && petals.length < MAX && Math.random() < 0.3) petals.push(createPetal());
+
+      for (const p of petals){
+        if (p.target && forming){
+          // Ease towards the target
+          const dx = p.target.x - p.x;
+          const dy = p.target.y - p.y;
+          const dist = Math.hypot(dx, dy);
+          const spd = Math.max(0.6, 6 * (1/(1+dist*0.02))); // slow down near target
+          p.x += dx * 0.04 * spd;
+          p.y += dy * 0.04 * spd;
+          p.rot += p.rotSpeed * 0.3;
+          p.wobble += p.wobbleSpeed * 0.5;
+          if (dist < 1.7) {
+            p.arriveT += dt;
+            if (p.arriveT > 400) {
+              // settle
+              p.rot *= 0.98;
+            }
+          }
+        } else {
+          // Falling
+          p.wobble += p.wobbleSpeed;
+          p.x += Math.sin(p.wobble)*0.4 + p.vx;
+          p.y += p.vy;
+          p.rot += p.rotSpeed;
+          if (p.y > stage.clientHeight + 20) {
+            // recycle to the top
+            p.y = -20; p.x = rand(0, stage.clientWidth);
+          }
+        }
+        drawPetal(p);
+      }
+
+      requestAnimationFrame(tick);
+    }
+
+    // Orchestrate timeline
+    function orchestrate(){
+      OVERLAY.textContent = '';
+      formed = false; forming = false;
+      // after a short moment, start forming into the phrase
+      setTimeout(() => {
+        assignTargets();
+        // show overlay soft glow text as it forms (assist readability)
+        OVERLAY.textContent = TARGET_TEXT;
+        OVERLAY.classList.add('fade-in');
+        setTimeout(()=>{ OVERLAY.classList.remove('fade-in') }, 1000);
+        // mark as formed after a while
+        setTimeout(()=>{ formed = true; }, 4500);
+      }, 3200);
+      // reveal the panel slightly later
+      setTimeout(() => {
+        PANEL.classList.add('fade-in');
+      }, 5200);
+    }
+
+    // Answer logic
+    function normalize(s){return (s||'').toLowerCase().trim().replace(/\s+/g,' ')}
+
+    FORM.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ok = normalize(ANSWER.value) === 'what is love';
+      if (ok){
+        // transition to screen 2
+        document.querySelector('.wrap').style.display = 'none';
+        SCREEN2.classList.add('active');
+      } else {
+        ANSWER.style.borderColor = '#e05a9b';
+        ANSWER.animate([
+          { transform:'translateX(0)' },
+          { transform:'translateX(-6px)' },
+          { transform:'translateX(6px)' },
+          { transform:'translateX(0)' }
+        ], { duration:180, iterations:2 });
+      }
+    });
+
+    RESTART?.addEventListener('click', () => {
+      // reset
+      SCREEN2.classList.remove('active');
+      document.querySelector('.wrap').style.display = '';
+      ANSWER.value='';
+      ANSWER.style.borderColor='';
+      petals.splice(0, petals.length);
+      for (let i=0;i<Math.min(MAX, Math.ceil(stage.clientWidth*stage.clientHeight/1600));i++) {
+        petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
+      }
+      fit();
+      orchestrate();
+    });
+
+    // Audio control (requires user gesture)
+    let audioOn = false;
+    async function toggleMusic(){
+      try{
+        if (!audioOn){
+          if (BGM.src === '' && !BGM.querySelector('source')){
+            // If no source provided, create a very soft WebAudio pad as fallback
+            await startWebAudioLofi();
+          } else {
+            await BGM.play();
+          }
+          audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
+          MUSIC_BTN.textContent = 'Выключить музыку';
+        } else {
+          if (audioCtx){ audioCtx.suspend(); }
+          BGM.pause();
+          audioOn = false; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: выкл';
+          MUSIC_BTN.textContent = 'Включить музыку';
+        }
+      }catch(err){
+        console.warn('Audio play blocked or failed:', err);
+      }
+    }
+    MUSIC_BTN.addEventListener('click', toggleMusic);
+
+    // Minimal WebAudio fallback: gentle lo-fi pad
+    let audioCtx, gNodes=[];
+    async function startWebAudioLofi(){
+      if (audioCtx) { await audioCtx.resume(); return; }
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const master = audioCtx.createGain(); master.gain.value = 0.05; master.connect(audioCtx.destination);
+
+      function makePad(freq){
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.value = freq;
+        g.gain.value = 0.0001;
+        o.connect(g).connect(master);
+        o.start();
+        // slow breathing
+        const now = audioCtx.currentTime;
+        g.gain.cancelScheduledValues(now);
+        g.gain.linearRampToValueAtTime(0.08, now+2+Math.random()*2);
+        function modulate(){
+          const t = audioCtx.currentTime;
+          g.gain.linearRampToValueAtTime(0.03+Math.random()*0.08, t+3);
+          setTimeout(modulate, 3000);
+        }
+        modulate();
+        return {o,g};
+      }
+      // triad-ish chords
+      const base = 220; // A3-ish
+      gNodes = [ makePad(base), makePad(base*1.25), makePad(base*1.5) ];
+    }
+
+    // init
+    fit();
+    buildTextTargets();
+    orchestrate();
+    requestAnimationFrame(tick);
+  })();
+  </script>
+</body>
+</html>
