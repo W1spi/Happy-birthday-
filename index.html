@@ -152,9 +152,7 @@
     }
     }
 
-    for (let i=0;i<Math.min(MAX, Math.ceil(stage.clientWidth*stage.clientHeight/1600));i++) {
-      petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
-    }
+    // initial petals now seeded in seedPetals()
 
     // Draw a single petal as a soft rotated teardrop/ellipse
     function drawPetal(p) {
@@ -300,7 +298,6 @@
       const dt = Math.min(32, t - last); last = t;
       CTX.clearRect(0,0, stage.clientWidth, stage.clientHeight);
 
-      // Spawn extra petals over time until MAX
       if (!forming && petals.length < MAX && Math.random() < 0.3) petals.push(createPetal());
 
       for (const p of petals){
@@ -308,7 +305,7 @@
           const dx = p.target.x - p.x;
           const dy = p.target.y - p.y;
           const dist = Math.hypot(dx, dy);
-          const k = 0.12; // stronger attraction
+          const k = 0.12;
           p.vx = (p.vx||0) * 0.82 + dx * k * 0.03;
           p.vy = (p.vy||0) * 0.82 + dy * k * 0.03;
           p.x += p.vx; p.y += p.vy;
@@ -316,7 +313,6 @@
           p.wobble += p.wobbleSpeed * 0.25;
           if (dist < 1.4){ p.x = p.target.x; p.y = p.target.y; p.vx = p.vy = 0; p.arriveT += dt; }
         } else {
-          // Falling (or fading extras when forming)
           if (forming) { p.alpha *= 0.985; }
           p.wobble += p.wobbleSpeed;
           p.x += Math.sin(p.wobble)*0.35 + (p.vx||0);
@@ -324,20 +320,26 @@
           p.rot += p.rotSpeed;
           if (p.y > stage.clientHeight + 22) { p.y = -22; p.x = rand(0, stage.clientWidth); }
         }
-          // Falling
-          p.wobble += p.wobbleSpeed;
-          p.x += Math.sin(p.wobble)*0.4 + p.vx;
-          p.y += p.vy;
-          p.rot += p.rotSpeed;
-          if (p.y > stage.clientHeight + 20) {
-            // recycle to the top
-            p.y = -20; p.x = rand(0, stage.clientWidth);
-          }
-        }
         drawPetal(p);
       }
 
       requestAnimationFrame(tick);
+    }
+
+    function seedPetals(){
+      petals.splice(0, petals.length);
+      const base = Math.ceil(stage.clientWidth*stage.clientHeight/2200);
+      const cap = (stage.clientWidth < 520 ? 380 : 750);
+      const need = Math.min(cap, base);
+      for (let i=0;i<need;i++) petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
+    }
+
+    // init
+    fit();
+    seedPetals();
+    buildTextTargets();
+    orchestrate();
+    requestAnimationFrame(tick);
     }
 
     // Orchestrate timeline
@@ -379,8 +381,15 @@
     });
 
     RESTART?.addEventListener('click', () => {
-      // reset
       SCREEN2.classList.remove('active');
+      document.querySelector('.wrap').style.display = '';
+      ANSWER.value=''; ANSWER.style.borderColor='';
+      fit();
+      seedPetals();
+      buildTextTargets();
+      forming = false; formed = false;
+      orchestrate();
+    });
       document.querySelector('.wrap').style.display = '';
       ANSWER.value='';
       ANSWER.style.borderColor='';
@@ -397,10 +406,21 @@
     async function toggleMusic(){
       try{
         if (!audioOn){
-          if (BGM.src === '' && !BGM.querySelector('source')){
-            // If no source provided, create a very soft WebAudio pad as fallback
-            await startWebAudioLofi();
+          if (BGM.querySelector('source')){
+            await BGM.play();
           } else {
+            startWebAudioLofi();
+          }
+          audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
+          MUSIC_BTN.textContent = 'Выключить музыку';
+        } else {
+          if (audioCtx && audioCtx.state !== 'closed') { audioCtx.suspend(); }
+          if (!BGM.paused) BGM.pause();
+          audioOn = false; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: выкл';
+          MUSIC_BTN.textContent = 'Включить музыку';
+        }
+      }catch(err){ console.warn('Audio error', err); }
+    } else {
             await BGM.play();
           }
           audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
@@ -418,10 +438,10 @@
     MUSIC_BTN.addEventListener('click', toggleMusic);
 
     // Minimal WebAudio fallback: gentle lo-fi pad
-    let audioCtx, gNodes=[];
-    async function startWebAudioLofi(){
-      if (audioCtx) { await audioCtx.resume(); return; }
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let audioCtx; let gNodes=[];
+    function startWebAudioLofi(){
+      if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); return; }
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const master = audioCtx.createGain(); master.gain.value = 0.05; master.connect(audioCtx.destination);
 
       function makePad(freq){
@@ -432,7 +452,6 @@
         g.gain.value = 0.0001;
         o.connect(g).connect(master);
         o.start();
-        // slow breathing
         const now = audioCtx.currentTime;
         g.gain.cancelScheduledValues(now);
         g.gain.linearRampToValueAtTime(0.08, now+2+Math.random()*2);
@@ -444,9 +463,9 @@
         modulate();
         return {o,g};
       }
-      // triad-ish chords
-      const base = 220; // A3-ish
+      const base = 220;
       gNodes = [ makePad(base), makePad(base*1.25), makePad(base*1.5) ];
+    }
     }
 
     // init
