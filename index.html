@@ -45,7 +45,7 @@
     .card p{font-size:18px; color:var(--muted)}
 
     /* Audio button */
-    .audio-ctrl{position:fixed; right:16px; bottom:16px; display:flex; gap:10px}
+    .audio-ctrl{position:fixed; right:16px; top:16px; display:flex; gap:10px}
     .tag{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #2a2a3b; background:#14141b; color:#cfcfde; font-size:12px}
     .dot{width:8px;height:8px;border-radius:50%;background:#e05a9b; box-shadow:0 0 10px #e05a9b88}
 
@@ -58,7 +58,7 @@
     <div class="stage" id="stage">
       <canvas id="petals"></canvas>
       <!-- Optional overlay text while forming -->
-      <div id="overlayText" class="title-overlay" aria-hidden="true"></div>
+      
     </div>
 
     <div class="panel" id="panel" aria-live="polite">
@@ -87,12 +87,7 @@
 
   <!-- Background music (provide your own lofi.mp3 or keep off) -->
   <audio id="bgm" preload="auto" loop>
-    <!--
-      💿 Положи рядом с index.html файл lofi.mp3 (или укажи абсолютную ссылку на любимый трек),
-      например оттуда, где легально разрешено распространение.
-      Пример (замени src ниже):
-      <source src="https://cdn.pixabay.com/download/audio/2023/02/22/audio_6f4b6b.mp3?filename=lofi-study-140150.mp3" type="audio/mpeg" />
-    -->
+    <source src="lofi.mp3" type="audio/mpeg" />
   </audio>
 
   <div class="audio-ctrl">
@@ -131,28 +126,30 @@
 
     // Particles (petals)
     const petals = [];
-    const MAX = Math.min(900, Math.ceil(stage.clientWidth*stage.clientHeight/2200));
-    const palette = [ '#ffd1e0', '#ffc2da', '#ffb3d4', '#ffa3cd', '#ff94c7', '#ff86c1' ];
+    const MAX = Math.min((stage.clientWidth<520?420:800), Math.ceil(stage.clientWidth*stage.clientHeight/2800));
+    const palette = [ '#ffd7e5', '#ffc7df', '#ffb8d9', '#ffa9d3', '#ff9acd', '#ff8bc7' ];
 
     function rand(a,b){return Math.random()*(b-a)+a}
     function pick(arr){return arr[(Math.random()*arr.length)|0]}
 
     function createPetal(yStart = rand(-stage.clientHeight, 0)){
-      const size = rand(6, 16);
+      const size = rand(5, 12);
       return {
         x: rand(0, stage.clientWidth),
         y: yStart,
-        vx: rand(-0.4, 0.4),
-        vy: rand(0.6, 1.6),
+        vx: rand(-0.3, 0.3),
+        vy: rand(0.5, 1.3),
         wobble: rand(0, Math.PI*2),
-        wobbleSpeed: rand(0.01, 0.03),
+        wobbleSpeed: rand(0.008, 0.02),
         rot: rand(0, Math.PI*2),
-        rotSpeed: rand(-0.02, 0.02),
+        rotSpeed: rand(-0.015, 0.015),
         size,
         color: pick(palette),
         target: null,
-        arriveT: 0
+        arriveT: 0,
+        alpha: 1
       }
+    }
     }
 
     for (let i=0;i<Math.min(MAX, Math.ceil(stage.clientWidth*stage.clientHeight/1600));i++) {
@@ -163,14 +160,14 @@
     function drawPetal(p) {
       const s = p.size;
       CTX.save();
+      CTX.globalAlpha = Math.max(0, Math.min(1, p.alpha ?? 1));
       CTX.translate(p.x, p.y);
-      CTX.rotate(p.rot + Math.sin(p.wobble)*0.2);
+      CTX.rotate(p.rot + Math.sin(p.wobble)*0.18);
       const grad = CTX.createRadialGradient(0, 0, 1, 0, 0, s);
-      grad.addColorStop(0, '#fff5f8');
+      grad.addColorStop(0, '#fff7fa');
       grad.addColorStop(1, p.color);
       CTX.fillStyle = grad;
       CTX.beginPath();
-      // A simple leaf/petal-ish shape using bezier
       CTX.moveTo(0, -s*0.2);
       CTX.bezierCurveTo(s*0.9, -s*0.9,  s*0.9,  s*0.9, 0, s);
       CTX.bezierCurveTo(-s*0.9,  s*0.9, -s*0.9, -s*0.9, 0, -s*0.2);
@@ -187,18 +184,43 @@
     function buildTextTargets(){
       const w = stage.clientWidth;
       const h = stage.clientHeight;
-      // render to a smaller offscreen canvas for cleaner sampling on mobile
-      const scale = (w < 520 ? 0.45 : 0.6);
-      const offW = Math.max(240, Math.floor(w*scale));
-      const offH = Math.max(160, Math.floor(h*scale));
+      // smaller offscreen for crisp sampling on mobile
+      const isPhone = w < 520;
+      const scale = isPhone ? 0.42 : 0.58;
+      const offW = Math.max(220, Math.floor(w*scale));
+      const offH = Math.max(140, Math.floor(h*scale));
       const off = document.createElement('canvas');
       off.width = offW; off.height = offH;
       const c = off.getContext('2d');
-      const fontSize = Math.max(26, Math.min(90, Math.floor(offW * 0.18)));
+      const fontSize = Math.max(26, Math.min(84, Math.floor(offW * 0.2)));
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      c.font = `800 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      c.clearRect(0,0,offW,offH);
+      c.fillText(TARGET_TEXT, offW/2, offH/2);
+      const img = c.getImageData(0,0,offW,offH).data;
+      const step = isPhone ? 4 : 3; // reduce density on phones
+      const collected = [];
+      for (let y = 0; y < offH; y += step) {
+        for (let x = 0; x < offW; x += step) {
+          const a = img[(y*offW + x)*4 + 3];
+          if (a > 150) collected.push({x: Math.floor(x/scale), y: Math.floor(y/scale)});
+        }
+      }
+      // limit total targets for readability
+      const maxTargets = isPhone ? 240 : 520;
+      if (collected.length > maxTargets){
+        const stride = Math.max(1, Math.floor(collected.length / maxTargets));
+        targets = collected.filter((_, i) => i % stride === 0).slice(0, maxTargets);
+      } else {
+        targets = collected;
+      }
+      // shuffle
+      for (let i=targets.length-1;i>0;i--){
+        const j = (Math.random()* (i+1))|0; [targets[i], targets[j]] = [targets[j], targets[i]];
+      }
+    }px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
       c.clearRect(0,0,offW,offH);
       c.fillText(TARGET_TEXT, offW/2, offH/2);
 
@@ -245,12 +267,23 @@
     }
 
     function assignTargets(){
-      const need = Math.min(petals.length, targets.length);
-      // ensure enough petals to cover targets
-      if (petals.length < targets.length){
-        const toAdd = targets.length - petals.length;
-        for (let i=0;i<toAdd;i++) petals.push(createPetal(rand(-stage.clientHeight, 0)));
+      const need = targets.length;
+      // ensure enough petals; cap extras to fade out
+      while (petals.length < need) petals.push(createPetal(rand(-stage.clientHeight, 0)));
+      for (let i=0;i<petals.length;i++){
+        const p = petals[i];
+        if (i < need){
+          p.target = targets[i];
+          p.alpha = 1;
+        } else {
+          p.target = null;
+          // these will fade out during forming
+          p.alpha = 0.5;
+        }
+        p.arriveT = 0;
       }
+      forming = true;
+    }
       for (let i=0;i<need;i++){
         const p = petals[i];
         p.target = targets[i];
@@ -272,19 +305,25 @@
 
       for (const p of petals){
         if (p.target && forming){
-          // Ease towards the target with stronger attraction and snap near end
           const dx = p.target.x - p.x;
           const dy = p.target.y - p.y;
           const dist = Math.hypot(dx, dy);
-          const k = 0.08; // attraction
-          p.vx = (p.vx||0) * 0.85 + dx * k * 0.02;
-          p.vy = (p.vy||0) * 0.85 + dy * k * 0.02;
-          p.x += p.vx;
-          p.y += p.vy;
-          p.rot *= 0.98;
-          p.wobble += p.wobbleSpeed * 0.3;
-          if (dist < 1.2){ p.x = p.target.x; p.y = p.target.y; p.vx = p.vy = 0; p.arriveT += dt; }
+          const k = 0.12; // stronger attraction
+          p.vx = (p.vx||0) * 0.82 + dx * k * 0.03;
+          p.vy = (p.vy||0) * 0.82 + dy * k * 0.03;
+          p.x += p.vx; p.y += p.vy;
+          p.rot *= 0.97;
+          p.wobble += p.wobbleSpeed * 0.25;
+          if (dist < 1.4){ p.x = p.target.x; p.y = p.target.y; p.vx = p.vy = 0; p.arriveT += dt; }
         } else {
+          // Falling (or fading extras when forming)
+          if (forming) { p.alpha *= 0.985; }
+          p.wobble += p.wobbleSpeed;
+          p.x += Math.sin(p.wobble)*0.35 + (p.vx||0);
+          p.y += (p.vy||0) + rand(0.5, 1.2);
+          p.rot += p.rotSpeed;
+          if (p.y > stage.clientHeight + 22) { p.y = -22; p.x = rand(0, stage.clientWidth); }
+        }
           // Falling
           p.wobble += p.wobbleSpeed;
           p.x += Math.sin(p.wobble)*0.4 + p.vx;
@@ -303,7 +342,7 @@
 
     // Orchestrate timeline
     function orchestrate(){
-      OVERLAY.textContent = '';
+      
       formed = false; forming = false;
       // after a short moment, start forming into the phrase
       setTimeout(() => {
@@ -314,7 +353,7 @@
       }, 3200);
       // reveal the panel slightly later
       setTimeout(() => {
-        PANEL.classList.add('fade-in');
+        PANEL.classList.add('fade-in'); ANSWER.focus();
       }, 5200);
     }
 
