@@ -79,6 +79,7 @@
 
   <script>
   ;(() => {
+    const PETAL_SCALE = 0.66; // <-- уменьшение размера лепестков (~в 1.5 раза)
     const stage  = document.getElementById('stage');
     const canvas = document.getElementById('petals');
     const ctx    = canvas.getContext('2d');
@@ -115,7 +116,7 @@
     const pick = a=>a[(Math.random()*a.length)|0];
 
     function createPetal(y = rand(-stage.clientHeight, 0)){
-      const size = rand(5,12);
+      const size = rand(5,12) * PETAL_SCALE; // уменьшили размер
       return {
         x: rand(0, stage.clientWidth),
         y,
@@ -170,15 +171,15 @@
       const h = stage.clientHeight || Math.floor(window.innerHeight*0.6);
       const isPhone = window.innerWidth < 520;
       const lines = getLines();
-      const lineGap = 1.25; // межстрочный коэффициент
+      const lineGap = 1.25;
 
-      // offscreen полотнище под сцену
+      // offscreen = размер сцены (удобно вмещать дальше)
       const off = document.createElement('canvas');
       off.width  = Math.max(320, Math.floor(w));
       off.height = Math.max(180, Math.floor(h));
       const c = off.getContext('2d');
 
-      // базовый размер строки (далее всё равно впишем bbox в сцену)
+      // базовый размер строки (потом всё равно впишем bbox)
       const fsBase = Math.max(22, Math.floor(h * (isPhone ? 0.18 : 0.30)));
       c.clearRect(0,0,off.width,off.height);
       c.fillStyle = '#fff';
@@ -216,9 +217,9 @@
       const bh = Math.max(1, maxY-minY);
       const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
 
-      // поля сцены: ширина 88%, высота 62% (на телефоне чуть компактнее)
+      // поля сцены: ширина 88%, высота 60% (на телефоне компактнее)
       const targetW = w * (isPhone ? 0.86 : 0.88);
-      const targetH = h * (isPhone ? 0.58 : 0.62);
+      const targetH = h * (isPhone ? 0.56 : 0.60);
       const scale   = Math.min(targetW / bw, targetH / bh);
 
       // перенос точек в сцену
@@ -238,7 +239,7 @@
         pts = pts.filter((_, i) => i % stride === 0).slice(0, maxPts);
       }
 
-      // перемешиваем, чтобы не было «скан-линий»
+      // перемешиваем — меньше «скан-линий» при формировании
       for (let i=pts.length-1;i>0;i--){
         const j=(Math.random()*(i+1))|0; [pts[i],pts[j]]=[pts[j],pts[i]];
       }
@@ -292,7 +293,7 @@
       fit();
       seed();
       buildTargets();
-      setTimeout(assign, 2200); // даём «провалиться» снегу
+      setTimeout(assign, 2200);
       requestAnimationFrame(tick);
     }
 
