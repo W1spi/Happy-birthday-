@@ -1,68 +1,353 @@
-function buildTargets(){
-  const w = stage.clientWidth || window.innerWidth;
-  const h = stage.clientHeight || Math.floor(window.innerHeight*0.6);
-  const isPhone = window.innerWidth < 520;
-
-  // 1) Рендерим текст на оффскрин-канвас при базовом размере
-  const off = document.createElement('canvas');
-  off.width  = Math.max(300, Math.floor(w));
-  off.height = Math.max(160, Math.floor(h));
-  const c = off.getContext('2d');
-
-  const fsBase = Math.max(28, Math.floor(h * 0.30));
-  c.clearRect(0,0,off.width,off.height);
-  c.fillStyle   = '#fff';
-  c.textAlign   = 'center';
-  c.textBaseline= 'middle';
-  c.font        = `900 ${fsBase}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-  c.fillText(TEXT, off.width/2, off.height/2);
-
-  // 2) Семплим альфа-канал в “сырые” точки
-  const img  = c.getImageData(0,0,off.width,off.height).data;
-  const step = isPhone ? 4 : 3; // реже на телефоне
-  const raw  = [];
-  for (let y=0; y<off.height; y+=step){
-    for (let x=0; x<off.width; x+=step){
-      const a = img[(y*off.width + x)*4 + 3];
-      if (a > 150) raw.push({x,y});
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>С днём рождения!</title>
+  <style>
+    :root{ --bg:#0f0f13; --fg:#e9e9ee; --muted:#b7b7c2; --accent:#ff6fa9; }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+      background:radial-gradient(1200px 800px at 50% 20%,#1a1a22,var(--bg));
+      color:var(--fg);
+      overflow-x:hidden;
     }
-  }
-  if (!raw.length){ targets = []; return; }
+    .wrap{min-height:100vh; display:flex; flex-direction:column; align-items:center;}
+    .stage{position:relative; width:100%; height:60vh; max-height:720px; overflow:hidden}
+    canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+    .panel{width:min(720px,92vw); margin:24px auto 16px; padding:18px 20px; background:#16161d; border:1px solid #242433; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel h2{margin:0 0 10px; font-size:18px; font-weight:600}
+    .panel p{margin:0 0 14px; color:var(--muted)}
+    .row{display:flex; gap:10px}
+    input[type=text]{flex:1; padding:12px 14px; border-radius:12px; border:1px solid #2a2a3b; background:#0d0d12; color:var(--fg); font-size:16px}
+    input::placeholder{color:#6a6a79}
+    button{padding:12px 16px; border-radius:12px; border:1px solid #2a2a3b; background:linear-gradient(180deg,#1f1f29,#171720); color:var(--fg); cursor:pointer; font-weight:600}
+    button:hover{filter:brightness(1.08)}
+    .hint{margin-top:8px; font-size:13px; color:#8b8b98}
+    .foot{opacity:.6; font-size:12px; text-align:center; margin:20px 0 30px}
 
-  // 3) BBox текста
-  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  for (const p of raw){
-    if (p.x<minX)minX=p.x; if (p.x>maxX)maxX=p.x;
-    if (p.y<minY)minY=p.y; if (p.y>maxY)maxY=p.y;
-  }
-  const bw = Math.max(1, maxX-minX);
-  const bh = Math.max(1, maxY-minY);
-  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+    .screen{display:none; min-height:100vh; align-items:center; justify-content:center; padding:40px 20px}
+    .screen.active{display:flex}
+    .card{width:min(820px,95vw); background:#16161d; border:1px solid #242433; border-radius:18px; padding:36px; text-align:center; box-shadow:0 12px 36px rgba(0,0,0,.4)}
+    .card h1{font-size:28px; margin:0 0 10px}
+    .card p{font-size:18px; color:var(--muted)}
 
-  // 4) Вписываем в сцену с полями: ширина 90%, высота 62%
-  const targetW = w * 0.90;
-  const targetH = h * 0.62;
-  const scale   = Math.min(targetW / bw, targetH / bh);
+    .audio-ctrl{position:fixed; right:16px; top:16px; display:flex; gap:10px; z-index:10}
+    .tag{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #2a2a3b; background:#14141b; color:#cfcfde; font-size:12px}
+    .dot{width:8px;height:8px;border-radius:50%;background:#e05a9b; box-shadow:0 0 10px #e05a9b88}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stage" id="stage">
+      <canvas id="petals"></canvas>
+    </div>
 
-  // 5) Преобразуем в координаты сцены и слегка ограничиваем
-  let pts = raw.map(p => {
-    const px = (p.x - cx) * scale + w/2;
-    const py = (p.y - cy) * scale + h/2;
-    const x = Math.max(1, Math.min(w-2, Math.round(px)));
-    const y = Math.max(1, Math.min(h-2, Math.round(py)));
-    return {x,y};
-  });
+    <div class="panel" id="panel" aria-live="polite">
+      <h2>напомни, кто отправил тебе это?</h2>
+      <p>Подсказка: это одна-единственная фраза, под которой он у тебя сохранён 🙂</p>
+      <form class="row" id="answerForm">
+        <input id="answer" type="text" placeholder="введи фразу" autocomplete="off" maxlength="64" />
+        <button type="submit">Ок</button>
+      </form>
+      <div class="hint">Небольшой намёк: английский, три слова.</div>
+    </div>
 
-  // 6) Ограничиваем плотность, чтобы было читаемо
-  const maxPts = isPhone ? 240 : 620;
-  if (pts.length > maxPts){
-    const stride = Math.max(1, Math.floor(pts.length / maxPts));
-    pts = pts.filter((_, i) => i % stride === 0).slice(0, maxPts);
-  }
+    <div class="foot">Сделано с любовью братом 💜</div>
+  </div>
 
-  // 7) Перемешиваем, чтобы при формировании не было “скан-линий”
-  for (let i=pts.length-1;i>0;i--){
-    const j=(Math.random()*(i+1))|0; [pts[i],pts[j]]=[pts[j],pts[i]];
-  }
-  targets = pts;
-}
+  <section class="screen" id="screen2">
+    <div class="card">
+      <h1>Верно! 🎉</h1>
+      <p>Я просто хотел сказать, что ты всегда была светом, даже когда день пасмурный ❤️</p>
+      <div style="margin-top:18px"><button id="restartBtn">Ещё раз</button></div>
+    </div>
+  </section>
+
+  <!-- Положи lofi.mp3 рядом с index.html -->
+  <audio id="bgm" preload="auto" loop playsinline>
+    <source src="lofi.mp3" type="audio/mpeg"/>
+  </audio>
+
+  <div class="audio-ctrl">
+    <span class="tag" id="musicState"><span class="dot"></span> музыка: выкл</span>
+    <button id="musicBtn" title="Включить музыку">Включить музыку</button>
+  </div>
+
+  <script>
+  ;(() => {
+    const TEXT = 'С днём рождения!';
+
+    const stage  = document.getElementById('stage');
+    const canvas = document.getElementById('petals');
+    const ctx    = canvas.getContext('2d');
+
+    const form   = document.getElementById('answerForm');
+    const answer = document.getElementById('answer');
+    const screen2= document.getElementById('screen2');
+    const restart= document.getElementById('restartBtn');
+
+    const musicBtn   = document.getElementById('musicBtn');
+    const musicState = document.getElementById('musicState');
+    const bgm        = document.getElementById('bgm');
+
+    // --- sizing ---
+    function fit(){
+      const w = stage.clientWidth || window.innerWidth;
+      const h = stage.clientHeight || Math.floor(window.innerHeight*0.6);
+      const dpr = Math.min(window.devicePixelRatio||1, 2);
+      canvas.width  = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width  = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    window.addEventListener('resize', () => { fit(); buildTargets(); });
+
+    // --- petals ---
+    const petals = [];
+    let targets = [];
+    let forming = false;
+
+    const palette = ['#ffd7e5','#ffc7df','#ffb8d9','#ffa9d3','#ff9acd','#ff8bc7'];
+    const rand = (a,b)=>Math.random()*(b-a)+a;
+    const pick = a=>a[(Math.random()*a.length)|0];
+
+    function createPetal(y = rand(-stage.clientHeight, 0)){
+      const size = rand(5,12);
+      return {
+        x: rand(0, stage.clientWidth),
+        y,
+        vx: rand(-0.25,0.25),
+        vy: rand(0.7,1.4),
+        wobble: rand(0,Math.PI*2),
+        wobbleSpeed: rand(0.008,0.02),
+        rot: rand(0,Math.PI*2),
+        rotSpeed: rand(-0.015,0.015),
+        size,
+        color: pick(palette),
+        target: null,
+        alpha: 1
+      };
+    }
+
+    function seed(){
+      petals.length = 0;
+      const area = stage.clientWidth * stage.clientHeight;
+      const base = Math.ceil(area / 2600);
+      const cap  = (window.innerWidth < 520) ? 280 : 520;
+      const need = Math.min(cap, base);
+      for (let i=0;i<need;i++) petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
+    }
+
+    function draw(p){
+      const s = p.size;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot + Math.sin(p.wobble)*0.18);
+      const g = ctx.createRadialGradient(0,0,1,0,0,s);
+      g.addColorStop(0,'#fff7fa'); g.addColorStop(1,p.color);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(0,-s*0.2);
+      ctx.bezierCurveTo(s*0.9,-s*0.9, s*0.9, s*0.9, 0, s);
+      ctx.bezierCurveTo(-s*0.9, s*0.9, -s*0.9, -s*0.9, 0, -s*0.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // --- buildTargets: гарантированное вписывание текста в сцену ---
+    function buildTargets(){
+      const w = stage.clientWidth || window.innerWidth;
+      const h = stage.clientHeight || Math.floor(window.innerHeight*0.6);
+      const isPhone = window.innerWidth < 520;
+
+      // 1) Рендерим текст на оффскрин
+      const off = document.createElement('canvas');
+      off.width  = Math.max(300, Math.floor(w));
+      off.height = Math.max(160, Math.floor(h));
+      const c = off.getContext('2d');
+
+      const fsBase = Math.max(28, Math.floor(h*0.30));
+      c.clearRect(0,0,off.width,off.height);
+      c.fillStyle = '#fff';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = `900 ${fsBase}px system-ui,-apple-system,Segoe UI,Roboto,Arial`;
+      c.fillText(TEXT, off.width/2, off.height/2);
+
+      // 2) Семплим альфу
+      const img = c.getImageData(0,0,off.width,off.height).data;
+      const step = isPhone ? 4 : 3;
+      const raw = [];
+      for (let y=0; y<off.height; y+=step){
+        for (let x=0; x<off.width; x+=step){
+          const a = img[(y*off.width + x)*4 + 3];
+          if (a > 150) raw.push({x,y});
+        }
+      }
+      if (!raw.length){ targets = []; return; }
+
+      // 3) BBox текста
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      for (const p of raw){
+        if (p.x<minX)minX=p.x; if (p.x>maxX)maxX=p.x;
+        if (p.y<minY)minY=p.y; if (p.y>maxY)maxY=p.y;
+      }
+      const bw = Math.max(1, maxX-minX);
+      const bh = Math.max(1, maxY-minY);
+      const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+
+      // 4) Вписываем в сцену с полями (не «выползет»)
+      const targetW = w * 0.88; // чуть меньше ширины
+      const targetH = h * 0.60; // и высоты
+      const scale   = Math.min(targetW / bw, targetH / bh);
+
+      // 5) Переносим точки в координаты сцены
+      let pts = raw.map(p => {
+        const px = (p.x - cx) * scale + w/2;
+        const py = (p.y - cy) * scale + h/2;
+        return {
+          x: Math.max(1, Math.min(w-2, Math.round(px))),
+          y: Math.max(1, Math.min(h-2, Math.round(py))),
+        };
+      });
+
+      // 6) Лимит плотности для читаемости
+      const maxPts = isPhone ? 220 : 620;
+      if (pts.length > maxPts){
+        const stride = Math.max(1, Math.floor(pts.length / maxPts));
+        pts = pts.filter((_, i) => i % stride === 0).slice(0, maxPts);
+      }
+
+      // 7) Перемешиваем
+      for (let i=pts.length-1;i>0;i--){
+        const j=(Math.random()*(i+1))|0; [pts[i],pts[j]]=[pts[j],pts[i]];
+      }
+      targets = pts;
+    }
+
+    // --- animation ---
+    let last = 0;
+    function tick(t){
+      if (!last) last = t;
+      const dt = Math.min(32, t-last); last = t; const s = dt/16.6667;
+      const W = stage.clientWidth, H = stage.clientHeight;
+
+      ctx.clearRect(0,0,W,H);
+
+      // подсыпем лепестков в свободном полёте до формирования
+      if (!forming && petals.length < 700 && Math.random() < 0.25) petals.push(createPetal());
+
+      for (const p of petals){
+        if (p.target && forming){
+          // тянемся к цели
+          const dx = p.target.x - p.x;
+          const dy = p.target.y - p.y;
+          const k = 0.18;
+          p.vx = p.vx*(1-0.18*s) + dx*k*0.02*s;
+          p.vy = p.vy*(1-0.18*s) + dy*k*0.02*s;
+          p.x += p.vx*s; p.y += p.vy*s;
+          p.rot += p.rotSpeed*s; p.wobble += p.wobbleSpeed*s;
+        } else {
+          // свободное падение
+          p.x += (p.vx + Math.sin(p.wobble)*0.25)*s;
+          p.y += p.vy*s;
+          p.vy += 0.02*s; // гравитация
+          p.rot += p.rotSpeed*s; p.wobble += p.wobbleSpeed*s;
+          if (p.y > H + 24){ p.y = -24; p.x = rand(0,W); p.vy = rand(0.7,1.4); }
+          if (forming) p.alpha *= 0.985; // «лишние» лепестки плавно бледнеют
+        }
+        draw(p);
+      }
+
+      requestAnimationFrame(tick);
+    }
+
+    function assign(){
+      // гарантия: лепестков не меньше, чем точек
+      while (petals.length < targets.length) petals.push(createPetal(rand(-stage.clientHeight,0)));
+      for (let i=0;i<targets.length;i++){
+        petals[i].target = targets[i];
+        petals[i].alpha = 1;
+      }
+      forming = true;
+    }
+
+    function start(){
+      fit();
+      seed();
+      buildTargets();
+      // даём «повалять снегу», затем собираем фразу
+      setTimeout(assign, 2500);
+      requestAnimationFrame(tick);
+    }
+
+    // --- answer flow ---
+    const norm = s => (s||'').toLowerCase().trim().replace(/\s+/g,' ');
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      if (norm(answer.value) === 'what is love'){
+        document.querySelector('.wrap').style.display='none';
+        screen2.classList.add('active');
+      } else {
+        answer.style.borderColor='#e05a9b';
+        answer.animate([
+          {transform:'translateX(0)'},
+          {transform:'translateX(-6px)'},
+          {transform:'translateX(6px)'},
+          {transform:'translateX(0)'}
+        ], {duration:180, iterations:2});
+      }
+    });
+
+    restart?.addEventListener('click', ()=>{
+      screen2.classList.remove('active');
+      document.querySelector('.wrap').style.display='';
+      answer.value=''; answer.style.borderColor='';
+      forming = false;
+      start();
+    });
+
+    // --- audio ---
+    let audioOn = false;
+    function ensureFile(){
+      // если по какой-то причине <source> не подхватился
+      if (!bgm.currentSrc){ bgm.src = 'lofi.mp3'; bgm.load(); }
+    }
+    async function toggleMusic(){
+      try{
+        ensureFile();
+        if (!audioOn){
+          if (bgm.readyState < 2) bgm.load();
+          bgm.currentTime = 0;
+          await bgm.play();
+          audioOn = true;
+          musicState.innerHTML = '<span class="dot"></span> музыка: вкл';
+          musicBtn.textContent = 'Выключить музыку';
+        } else {
+          bgm.pause();
+          audioOn = false;
+          musicState.innerHTML = '<span class="dot"></span> музыка: выкл';
+          musicBtn.textContent = 'Включить музыку';
+        }
+      }catch(e){
+        alert('Браузер заблокировал воспроизведение или файл недоступен. Открой страницу через локальный сервер (например: python -m http.server).');
+      }
+    }
+    musicBtn.addEventListener('click', toggleMusic);
+
+    // старт
+    if (document.readyState === 'complete' || document.readyState === 'interactive'){
+      setTimeout(start, 0);
+    } else {
+      window.addEventListener('DOMContentLoaded', () => setTimeout(start, 0), { once:true });
+    }
+  })();
+  </script>
+</body>
+</html>
