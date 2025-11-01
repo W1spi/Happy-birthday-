@@ -5,60 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>С днём рождения!</title>
   <style>
-    :root{
-      --bg:#0f0f13;
-      --fg:#e9e9ee;
-      --muted:#b7b7c2;
-      --accent:#ff6fa9;
-      --accent-2:#ffc1d9;
-    }
+    :root{ --bg:#0f0f13; --fg:#e9e9ee; --muted:#b7b7c2; --accent:#ff6fa9; }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0}
-    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, "Inter", Arial, sans-serif; background: radial-gradient(1200px 800px at 50% 20%, #1a1a22, var(--bg)); color:var(--fg); overflow-x:hidden}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; background:#0f0f13; color:var(--fg);}
     .wrap{min-height:100vh; display:flex; flex-direction:column; align-items:center;}
-
-    /* Stage area */
-    .stage{position:relative; width:100%; height:60vh; max-height:720px; overflow:hidden}
-    canvas#petals{position:absolute; inset:0; width:100%; height:100%; display:block}
-
-    .title-overlay{display:none !important}
-    .fade-in{animation:fadeIn .9s ease forwards}
-    @keyframes fadeIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
-
-    /* Prompt / input */
-    .panel{width:min(720px, 92vw); margin:24px auto 16px; padding:18px 20px; background:#16161d; border:1px solid #242433; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
-    .panel h2{margin:0 0 10px; font-size:18px; font-weight:600; color:var(--fg)}
+    .stage{position:relative;width:100%;height:60vh;max-height:720px;overflow:hidden;background:radial-gradient(1200px 800px at 50% 20%,#1a1a22,var(--bg));}
+    canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .panel{width:min(720px,92vw); margin:24px auto 16px; padding:18px 20px; background:#16161d; border:1px solid #242433; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel h2{margin:0 0 10px; font-size:18px; font-weight:600}
     .panel p{margin:0 0 14px; color:var(--muted)}
     .row{display:flex; gap:10px}
-    input[type="text"]{flex:1; padding:12px 14px; border-radius:12px; border:1px solid #2a2a3b; background:#0d0d12; color:var(--fg); font-size:16px}
-    input[type="text"]::placeholder{color:#6a6a79}
-    button{padding:12px 16px; border-radius:12px; border:1px solid #2a2a3b; background:linear-gradient(180deg, #1f1f29, #171720); color:var(--fg); cursor:pointer; font-weight:600}
-    button:hover{filter:brightness(1.1)}
-
-    .hint{margin-top:8px; font-size:13px; color:#8b8b98}
-
-    /* Second screen */
+    input[type=text]{flex:1; padding:12px 14px; border-radius:12px; border:1px solid #2a2a3b; background:#0d0d12; color:var(--fg); font-size:16px}
+    button{padding:12px 16px; border-radius:12px; border:1px solid #2a2a3b; background:linear-gradient(180deg,#1f1f29,#171720); color:var(--fg); cursor:pointer; font-weight:600}
+    .foot{opacity:.6; font-size:12px; text-align:center; margin:20px 0 30px}
     .screen{display:none; min-height:100vh; align-items:center; justify-content:center; padding:40px 20px}
     .screen.active{display:flex}
     .card{width:min(820px,95vw); background:#16161d; border:1px solid #242433; border-radius:18px; padding:36px; text-align:center; box-shadow:0 12px 36px rgba(0,0,0,.4)}
-    .card h1{font-size:28px; margin:0 0 10px}
-    .card p{font-size:18px; color:var(--muted)}
-
-    /* Audio button */
-    .audio-ctrl{position:fixed; right:16px; top:16px; display:flex; gap:10px}
+    .audio-ctrl{position:fixed; right:16px; top:16px; display:flex; gap:10px; z-index:10}
     .tag{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; border:1px solid #2a2a3b; background:#14141b; color:#cfcfde; font-size:12px}
     .dot{width:8px;height:8px;border-radius:50%;background:#e05a9b; box-shadow:0 0 10px #e05a9b88}
-
-    .foot{opacity:.6; font-size:12px; text-align:center; margin:20px 0 30px}
-    a{color:var(--accent)}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="stage" id="stage">
       <canvas id="petals"></canvas>
-      <!-- Optional overlay text while forming -->
-      
     </div>
 
     <div class="panel" id="panel" aria-live="polite">
@@ -66,274 +38,195 @@
       <p>Подсказка: это одна-единственная фраза, под которой он у тебя сохранён 🙂</p>
       <form class="row" id="answerForm">
         <input id="answer" type="text" placeholder="введи фразу" autocomplete="off" maxlength="64" />
-        <button type="submit" title="Проверить">Ок</button>
+        <button type="submit">Ок</button>
       </form>
-      <div class="hint">Небольшой намёк: английский, три слова.</div>
+      <div class="hint" style="margin-top:8px;color:#8b8b98;font-size:13px">Небольшой намёк: английский, три слова.</div>
     </div>
 
     <div class="foot">Сделано с любовью братом 💜</div>
   </div>
 
-  <!-- Success screen -->
   <section class="screen" id="screen2">
-    <div class="card fade-in">
+    <div class="card">
       <h1>Верно! 🎉</h1>
       <p>Я просто хотел сказать, что ты всегда была светом, даже когда день пасмурный ❤️</p>
-      <div style="margin-top:18px">
-        <button id="restartBtn">Ещё раз</button>
-      </div>
+      <div style="margin-top:18px"><button id="restartBtn">Ещё раз</button></div>
     </div>
   </section>
-
-  <!-- Background music (provide your own lofi.mp3 or keep off) -->
-  <audio id="bgm" preload="auto" loop>
-    <source src="lofi.mp3" type="audio/mpeg" />
-  </audio>
 
   <div class="audio-ctrl">
     <span class="tag" id="musicState"><span class="dot"></span> музыка: выкл</span>
     <button id="musicBtn" title="Включить музыку">Включить музыку</button>
   </div>
 
+  <!-- Положи lofi.mp3 рядом с index.html -->
+  <audio id="bgm" preload="auto" loop playsinline>
+    <source src="lofi.mp3" type="audio/mpeg" />
+  </audio>
+
   <script>
   ;(() => {
-    const CANVAS = document.getElementById('petals');
-    const CTX = CANVAS.getContext('2d');
-    const OVERLAY = null; // overlay removed
-    const PANEL = document.getElementById('panel');
-    const SCREEN2 = document.getElementById('screen2');
-    const ANSWER = document.getElementById('answer');
-    const FORM = document.getElementById('answerForm');
-    const MUSIC_BTN = document.getElementById('musicBtn');
-    const MUSIC_STATE = document.getElementById('musicState');
-    const BGM = document.getElementById('bgm');
-    const RESTART = document.getElementById('restartBtn');
-
-    // ensure audio element points to local file when available
-    if (!BGM.querySelector('source')){
-      BGM.src = 'lofi.mp3';
-    }
-    BGM.preload = 'auto';
-    BGM.load();
-
-    const TARGET_TEXT = 'С днём рождения!';
+    const canvas = document.getElementById('petals');
+    const ctx = canvas.getContext('2d');
     const stage = document.getElementById('stage');
 
-    // Resize canvas
-    function fit() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      CANVAS.width = Math.floor(stage.clientWidth * dpr);
-      CANVAS.height = Math.floor(stage.clientHeight * dpr);
-      CANVAS.style.width = stage.clientWidth + 'px';
-      CANVAS.style.height = stage.clientHeight + 'px';
-      CTX.setTransform(dpr, 0, 0, dpr, 0, 0);
-      buildTextTargets();
-    }
-    window.addEventListener('resize', fit);
+    const panel = document.getElementById('panel');
+    const screen2 = document.getElementById('screen2');
+    const form = document.getElementById('answerForm');
+    const answer = document.getElementById('answer');
+    const restart = document.getElementById('restartBtn');
 
-    // Particles (petals)
+    const musicBtn = document.getElementById('musicBtn');
+    const musicState = document.getElementById('musicState');
+    const bgm = document.getElementById('bgm');
+
+    const TEXT = 'С днём рождения!';
+
+    // ---------- Canvas sizing ----------
+    function fit(){
+      let w = stage.clientWidth || window.innerWidth;
+      let h = stage.clientHeight || Math.floor(window.innerHeight*0.6);
+      const dpr = Math.min(devicePixelRatio||1,2);
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    addEventListener('resize', () => { fit(); buildTargets(); });
+
+    // ---------- Particles ----------
     const petals = [];
-    const MAX = Math.min((stage.clientWidth<520?420:800), Math.ceil(stage.clientWidth*stage.clientHeight/2800));
-    const palette = [ '#ffd7e5', '#ffc7df', '#ffb8d9', '#ffa9d3', '#ff9acd', '#ff8bc7' ];
+    let targets = [];
+    let forming = false;
 
-    function rand(a,b){return Math.random()*(b-a)+a}
-    function pick(arr){return arr[(Math.random()*arr.length)|0]}
+    const palette = ['#ffd7e5','#ffc7df','#ffb8d9','#ffa9d3','#ff9acd','#ff8bc7'];
+    const MAX = 700;
 
-    function createPetal(yStart = rand(-stage.clientHeight, 0)){
-      const size = rand(5, 12);
-      return {
-        x: rand(0, stage.clientWidth),
-        y: yStart,
-        vx: rand(-0.25, 0.25),
-        vy: rand(0.7, 1.4), // px per frame baseline
-        wobble: rand(0, Math.PI*2),
-        wobbleSpeed: rand(0.008, 0.02),
-        rot: rand(0, Math.PI*2),
-        rotSpeed: rand(-0.015, 0.015),
-        size,
-        color: pick(palette),
-        target: null,
-        arriveT: 0,
-        alpha: 1
-      }
-    }
-    }
+    const rand = (a,b)=>Math.random()*(b-a)+a;
+    const pick = a => a[(Math.random()*a.length)|0];
+
+    function createPetal(y = rand(-stage.clientHeight, 0)){
+      const size = rand(5,12);
+      return { x: rand(0, stage.clientWidth), y, vx: rand(-0.25,0.25), vy: rand(0.7,1.4),
+               wobble: rand(0,Math.PI*2), wobbleSpeed: rand(0.008,0.02),
+               rot: rand(0,Math.PI*2), rotSpeed: rand(-0.015,0.015), size,
+               color: pick(palette), target:null, alpha:1 };
     }
 
-    // init
-    fit();
-    seedPetals();
-    buildTextTargets();
-    orchestrate();
-    requestAnimationFrame(tick);
-    }
-
-    function seedPetals(){
-      petals.splice(0, petals.length);
-      const base = Math.ceil(stage.clientWidth*stage.clientHeight/2200);
-      const cap = (stage.clientWidth < 520 ? 380 : 750);
+    function seed(){
+      petals.length = 0;
+      const base = Math.ceil(stage.clientWidth*stage.clientHeight/2600);
+      const cap = innerWidth < 520 ? 280 : 520;
       const need = Math.min(cap, base);
       for (let i=0;i<need;i++) petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
     }
 
-    // init
-    fit();
-    seedPetals();
-    buildTextTargets();
-    orchestrate();
-    requestAnimationFrame(tick);
+    function draw(p){
+      const s = p.size; ctx.save(); ctx.globalAlpha = p.alpha; ctx.translate(p.x,p.y); ctx.rotate(p.rot + Math.sin(p.wobble)*0.18);
+      const g = ctx.createRadialGradient(0,0,1,0,0,s); g.addColorStop(0,'#fff7fa'); g.addColorStop(1,p.color);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0,-s*0.2); ctx.bezierCurveTo(s*0.9,-s*0.9,s*0.9,s*0.9,0,s); ctx.bezierCurveTo(-s*0.9,s*0.9,-s*0.9,-s*0.9,0,-s*0.2); ctx.closePath(); ctx.fill(); ctx.restore();
     }
 
-    // Orchestrate timeline
-    function orchestrate(){
-      formed = false; forming = false;
-      // start forming after a pause so enough petals exist
-      setTimeout(() => {
-        assignTargets();
-        setTimeout(()=>{ formed = true; }, 4500);
-      }, 2500);
-      setTimeout(() => { PANEL.classList.add('fade-in'); ANSWER.focus(); }, 5200);
-    }, 4500);
-      }, 3200);
-      // reveal the panel slightly later
-      setTimeout(() => {
-        PANEL.classList.add('fade-in'); ANSWER.focus();
-      }, 5200);
+    // ---------- Text targets ----------
+    function buildTargets(){
+      const w = stage.clientWidth, h = stage.clientHeight;
+      const isPhone = innerWidth < 520;
+      const scale = isPhone ? 0.42 : 0.58;
+      const offW = Math.max(220, Math.floor(w*scale));
+      const offH = Math.max(140, Math.floor(h*scale));
+      const off = document.createElement('canvas'); off.width=offW; off.height=offH; const c = off.getContext('2d');
+      const fs = Math.max(26, Math.min(90, Math.floor(offW*0.2)));
+      c.clearRect(0,0,offW,offH); c.fillStyle='#fff'; c.textAlign='center'; c.textBaseline='middle'; c.font=`800 ${fs}px system-ui,-apple-system,Segoe UI,Roboto,Arial`; c.fillText(TEXT, offW/2, offH/2);
+      const img = c.getImageData(0,0,offW,offH).data;
+      const step = isPhone ? 4 : 3; const pts=[];
+      for (let y=0;y<offH;y+=step) for (let x=0;x<offW;x+=step) { const a = img[(y*offW + x)*4 + 3]; if (a>150) pts.push({x:Math.floor(x/scale),y:Math.floor(y/scale)}); }
+      const maxPts = isPhone ? 240 : 520;
+      targets = pts.length>maxPts ? pts.filter((_,i)=>i%Math.max(1,Math.floor(pts.length/maxPts))===0).slice(0,maxPts) : pts;
+      for (let i=targets.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [targets[i],targets[j]]=[targets[j],targets[i]]; }
     }
 
-    // Answer logic
-    function normalize(s){return (s||'').toLowerCase().trim().replace(/\s+/g,' ')}
+    // ---------- Animation ----------
+    let last = 0;
+    function tick(t){
+      if (!last) last = t;
+      const dt = Math.min(32, t-last); last = t; const s = dt/16.6667;
+      ctx.clearRect(0,0,stage.clientWidth,stage.clientHeight);
 
-    FORM.addEventListener('submit', (e) => {
+      if (!forming && petals.length < MAX && Math.random()<0.25) petals.push(createPetal());
+
+      for (const p of petals){
+        if (p.target && forming){
+          const dx=p.target.x-p.x, dy=p.target.y-p.y, k=0.18;
+          p.vx = p.vx*(1-0.18*s) + dx*k*0.02*s;
+          p.vy = p.vy*(1-0.18*s) + dy*k*0.02*s;
+          p.x += p.vx*s; p.y += p.vy*s;
+          p.rot += p.rotSpeed*s; p.wobble += p.wobbleSpeed*s;
+        } else {
+          p.x += (p.vx + Math.sin(p.wobble)*0.25)*s;
+          p.y += p.vy*s;
+          p.vy += 0.02*s;
+          p.rot += p.rotSpeed*s; p.wobble += p.wobbleSpeed*s;
+          if (p.y>stage.clientHeight+24){ p.y=-24; p.x=rand(0,stage.clientWidth); p.vy=rand(0.7,1.4); }
+          if (forming) p.alpha*=0.985;
+        }
+        draw(p);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function assign(){
+      while (petals.length < targets.length) petals.push(createPetal(rand(-stage.clientHeight,0)));
+      for (let i=0;i<targets.length;i++){ petals[i].target = targets[i]; petals[i].alpha = 1; }
+      forming = true;
+    }
+
+    function start(){
+      fit(); seed(); buildTargets();
+      setTimeout(assign, 2500); // даём «повалять снегу»
+      requestAnimationFrame(tick);
+    }
+
+    // ---------- Answer flow ----------
+    const norm = s => (s||'').toLowerCase().trim().replace(/\\s+/g,' ');
+    form.addEventListener('submit', e=>{
       e.preventDefault();
-      const ok = normalize(ANSWER.value) === 'what is love';
-      if (ok){
-        // transition to screen 2
-        document.querySelector('.wrap').style.display = 'none';
-        SCREEN2.classList.add('active');
+      if (norm(answer.value)==='what is love'){
+        document.querySelector('.wrap').style.display='none';
+        screen2.classList.add('active');
       } else {
-        ANSWER.style.borderColor = '#e05a9b';
-        ANSWER.animate([
-          { transform:'translateX(0)' },
-          { transform:'translateX(-6px)' },
-          { transform:'translateX(6px)' },
-          { transform:'translateX(0)' }
-        ], { duration:180, iterations:2 });
+        answer.style.borderColor='#e05a9b';
+        answer.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:180,iterations:2});
       }
     });
-
-    RESTART?.addEventListener('click', () => {
-      SCREEN2.classList.remove('active');
-      document.querySelector('.wrap').style.display = '';
-      ANSWER.value=''; ANSWER.style.borderColor='';
-      fit();
-      seedPetals();
-      buildTextTargets();
-      forming = false; formed = false;
-      orchestrate();
-    });
-      document.querySelector('.wrap').style.display = '';
-      ANSWER.value='';
-      ANSWER.style.borderColor='';
-      petals.splice(0, petals.length);
-      for (let i=0;i<Math.min(MAX, Math.ceil(stage.clientWidth*stage.clientHeight/1600));i++) {
-        petals.push(createPetal(rand(-stage.clientHeight, stage.clientHeight)));
-      }
-      fit();
-      orchestrate();
+    restart?.addEventListener('click', ()=>{
+      screen2.classList.remove('active'); document.querySelector('.wrap').style.display='';
+      answer.value=''; answer.style.borderColor=''; forming=false; start();
     });
 
-    // Audio control (requires user gesture)
-    let audioOn = false;
+    // ---------- Audio ----------
+    let audioOn=false;
+    function ensureFile(){
+      if (!bgm.currentSrc) { bgm.src = 'lofi.mp3'; bgm.load(); }
+    }
     async function toggleMusic(){
       try{
-        if (!audioOn){
-          // ensure a user gesture triggered this
-          if (BGM.readyState < 2){ BGM.load(); }
-          BGM.currentTime = 0;
-          await BGM.play();
-          audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
-          MUSIC_BTN.textContent = 'Выключить музыку';
-        } else {
-          if (!BGM.paused) BGM.pause();
-          if (audioCtx && audioCtx.state !== 'closed') { audioCtx.suspend(); }
-          audioOn = false; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: выкл';
-          MUSIC_BTN.textContent = 'Включить музыку';
-        }
-      }catch(err){
-        console.warn('Audio error', err);
-        // fallback to WebAudio pad after a gesture
-        if (!audioCtx) { startWebAudioLofi(); audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл'; MUSIC_BTN.textContent = 'Выключить музыку'; }
+        ensureFile();
+        if (!audioOn){ await bgm.play(); audioOn=true; musicState.innerHTML='<span class="dot"></span> музыка: вкл'; musicBtn.textContent='Выключить музыку'; }
+        else { bgm.pause(); audioOn=false; musicState.innerHTML='<span class="dot"></span> музыка: выкл'; musicBtn.textContent='Включить музыку'; }
+      }catch(e){
+        // Для локального file:// браузер может блочить — попробуй через http-сервер
+        alert('Музыку заблокировал браузер или файл недоступен. Запусти через простой локальный сервер (например: python -m http.server)');
       }
+    }
+    musicBtn.addEventListener('click', toggleMusic);
+
+    // ---------- Go ----------
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(start, 0);
     } else {
-            startWebAudioLofi();
-          }
-          audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
-          MUSIC_BTN.textContent = 'Выключить музыку';
-        } else {
-          if (audioCtx && audioCtx.state !== 'closed') { audioCtx.suspend(); }
-          if (!BGM.paused) BGM.pause();
-          audioOn = false; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: выкл';
-          MUSIC_BTN.textContent = 'Включить музыку';
-        }
-      }catch(err){ console.warn('Audio error', err); }
-    } else {
-            await BGM.play();
-          }
-          audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
-          MUSIC_BTN.textContent = 'Выключить музыку';
-        } else {
-          if (audioCtx){ audioCtx.suspend(); }
-          BGM.pause();
-          audioOn = false; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: выкл';
-          MUSIC_BTN.textContent = 'Включить музыку';
-        }
-      }catch(err){
-        console.warn('Audio play blocked or failed:', err);
-      }
+      window.addEventListener('DOMContentLoaded', () => setTimeout(start, 0), { once:true });
     }
-    MUSIC_BTN.addEventListener('click', toggleMusic);
-    // iOS unlock
-    window.addEventListener('touchstart', () => {
-      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    }, { once:true });
-
-    // Minimal WebAudio fallback: gentle lo-fi pad
-    let audioCtx; let gNodes=[];
-    function startWebAudioLofi(){
-      if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); return; }
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const master = audioCtx.createGain(); master.gain.value = 0.05; master.connect(audioCtx.destination);
-
-      function makePad(freq){
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.type = 'sine';
-        o.frequency.value = freq;
-        g.gain.value = 0.0001;
-        o.connect(g).connect(master);
-        o.start();
-        const now = audioCtx.currentTime;
-        g.gain.cancelScheduledValues(now);
-        g.gain.linearRampToValueAtTime(0.08, now+2+Math.random()*2);
-        function modulate(){
-          const t = audioCtx.currentTime;
-          g.gain.linearRampToValueAtTime(0.03+Math.random()*0.08, t+3);
-          setTimeout(modulate, 3000);
-        }
-        modulate();
-        return {o,g};
-      }
-      const base = 220;
-      gNodes = [ makePad(base), makePad(base*1.25), makePad(base*1.5) ];
-    }
-    }
-
-    // init
-    fit();
-    buildTextTargets();
-    orchestrate();
-    requestAnimationFrame(tick);
   })();
   </script>
 </body>
