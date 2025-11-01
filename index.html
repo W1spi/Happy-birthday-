@@ -99,7 +99,7 @@
   ;(() => {
     const CANVAS = document.getElementById('petals');
     const CTX = CANVAS.getContext('2d');
-    const OVERLAY = document.getElementById('overlayText');
+    const OVERLAY = null; // overlay removed
     const PANEL = document.getElementById('panel');
     const SCREEN2 = document.getElementById('screen2');
     const ANSWER = document.getElementById('answer');
@@ -108,6 +108,13 @@
     const MUSIC_STATE = document.getElementById('musicState');
     const BGM = document.getElementById('bgm');
     const RESTART = document.getElementById('restartBtn');
+
+    // ensure audio element points to local file when available
+    if (!BGM.querySelector('source')){
+      BGM.src = 'lofi.mp3';
+    }
+    BGM.preload = 'auto';
+    BGM.load();
 
     const TARGET_TEXT = 'С днём рождения!';
     const stage = document.getElementById('stage');
@@ -137,8 +144,8 @@
       return {
         x: rand(0, stage.clientWidth),
         y: yStart,
-        vx: rand(-0.3, 0.3),
-        vy: rand(0.5, 1.3),
+        vx: rand(-0.25, 0.25),
+        vy: rand(0.7, 1.4), // px per frame baseline
         wobble: rand(0, Math.PI*2),
         wobbleSpeed: rand(0.008, 0.02),
         rot: rand(0, Math.PI*2),
@@ -151,179 +158,14 @@
       }
     }
     }
-
-    // initial petals now seeded in seedPetals()
-
-    // Draw a single petal as a soft rotated teardrop/ellipse
-    function drawPetal(p) {
-      const s = p.size;
-      CTX.save();
-      CTX.globalAlpha = Math.max(0, Math.min(1, p.alpha ?? 1));
-      CTX.translate(p.x, p.y);
-      CTX.rotate(p.rot + Math.sin(p.wobble)*0.18);
-      const grad = CTX.createRadialGradient(0, 0, 1, 0, 0, s);
-      grad.addColorStop(0, '#fff7fa');
-      grad.addColorStop(1, p.color);
-      CTX.fillStyle = grad;
-      CTX.beginPath();
-      CTX.moveTo(0, -s*0.2);
-      CTX.bezierCurveTo(s*0.9, -s*0.9,  s*0.9,  s*0.9, 0, s);
-      CTX.bezierCurveTo(-s*0.9,  s*0.9, -s*0.9, -s*0.9, 0, -s*0.2);
-      CTX.closePath();
-      CTX.fill();
-      CTX.restore();
     }
 
-    // Text targets
-    let targets = [];
-    let forming = false;
-    let formed = false;
-
-    function buildTextTargets(){
-      const w = stage.clientWidth;
-      const h = stage.clientHeight;
-      // smaller offscreen for crisp sampling on mobile
-      const isPhone = w < 520;
-      const scale = isPhone ? 0.42 : 0.58;
-      const offW = Math.max(220, Math.floor(w*scale));
-      const offH = Math.max(140, Math.floor(h*scale));
-      const off = document.createElement('canvas');
-      off.width = offW; off.height = offH;
-      const c = off.getContext('2d');
-      const fontSize = Math.max(26, Math.min(84, Math.floor(offW * 0.2)));
-      c.fillStyle = '#ffffff';
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.font = `800 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      c.clearRect(0,0,offW,offH);
-      c.fillText(TARGET_TEXT, offW/2, offH/2);
-      const img = c.getImageData(0,0,offW,offH).data;
-      const step = isPhone ? 4 : 3; // reduce density on phones
-      const collected = [];
-      for (let y = 0; y < offH; y += step) {
-        for (let x = 0; x < offW; x += step) {
-          const a = img[(y*offW + x)*4 + 3];
-          if (a > 150) collected.push({x: Math.floor(x/scale), y: Math.floor(y/scale)});
-        }
-      }
-      // limit total targets for readability
-      const maxTargets = isPhone ? 240 : 520;
-      if (collected.length > maxTargets){
-        const stride = Math.max(1, Math.floor(collected.length / maxTargets));
-        targets = collected.filter((_, i) => i % stride === 0).slice(0, maxTargets);
-      } else {
-        targets = collected;
-      }
-      // shuffle
-      for (let i=targets.length-1;i>0;i--){
-        const j = (Math.random()* (i+1))|0; [targets[i], targets[j]] = [targets[j], targets[i]];
-      }
-    }px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      c.clearRect(0,0,offW,offH);
-      c.fillText(TARGET_TEXT, offW/2, offH/2);
-
-      const img = c.getImageData(0,0,offW,offH).data;
-      const step = (w < 520 ? 3 : 2); // sparser on phones
-      const collected = [];
-      for (let y = 0; y < offH; y += step) {
-        for (let x = 0; x < offW; x += step) {
-          const a = img[(y*offW + x)*4 + 3];
-          if (a > 140) collected.push({x: Math.floor(x/scale), y: Math.floor(y/scale)});
-        }
-      }
-      // limit number of targets for readability
-      const maxTargets = (w < 520 ? 380 : 750);
-      if (collected.length > maxTargets){
-        const stride = Math.floor(collected.length / maxTargets);
-        targets = collected.filter((_, i) => i % stride === 0).slice(0, maxTargets);
-      } else {
-        targets = collected;
-      }
-      // shuffle to avoid stripes
-      for (let i=targets.length-1;i>0;i--){
-        const j = (Math.random()* (i+1))|0; [targets[i], targets[j]] = [targets[j], targets[i]];
-      }
-    }px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      c.shadowColor = 'rgba(255,255,255,0.2)';
-      c.shadowBlur = 0;
-      c.clearRect(0,0,w,h);
-      c.fillText(TARGET_TEXT, w/2, h/2);
-
-      const step = Math.max(3, Math.floor((w*h)/300000)); // density control
-      const img = c.getImageData(0,0,w,h).data;
-      targets = [];
-      for (let y = 0; y < h; y += step) {
-        for (let x = 0; x < w; x += step) {
-          const a = img[(y*w + x)*4 + 3];
-          if (a > 150) targets.push({x, y});
-        }
-      }
-      // shuffle to avoid obvious stripes
-      for (let i=targets.length-1;i>0;i--){
-        const j = (Math.random()* (i+1))|0; [targets[i], targets[j]] = [targets[j], targets[i]];
-      }
-    }
-
-    function assignTargets(){
-      const need = targets.length;
-      // ensure enough petals; cap extras to fade out
-      while (petals.length < need) petals.push(createPetal(rand(-stage.clientHeight, 0)));
-      for (let i=0;i<petals.length;i++){
-        const p = petals[i];
-        if (i < need){
-          p.target = targets[i];
-          p.alpha = 1;
-        } else {
-          p.target = null;
-          // these will fade out during forming
-          p.alpha = 0.5;
-        }
-        p.arriveT = 0;
-      }
-      forming = true;
-    }
-      for (let i=0;i<need;i++){
-        const p = petals[i];
-        p.target = targets[i];
-        p.arriveT = 0;
-      }
-      forming = true;
-    }
-      forming = true;
-    }
-
-    // Animation loop
-    let last = performance.now();
-    function tick(t){
-      const dt = Math.min(32, t - last); last = t;
-      CTX.clearRect(0,0, stage.clientWidth, stage.clientHeight);
-
-      if (!forming && petals.length < MAX && Math.random() < 0.3) petals.push(createPetal());
-
-      for (const p of petals){
-        if (p.target && forming){
-          const dx = p.target.x - p.x;
-          const dy = p.target.y - p.y;
-          const dist = Math.hypot(dx, dy);
-          const k = 0.12;
-          p.vx = (p.vx||0) * 0.82 + dx * k * 0.03;
-          p.vy = (p.vy||0) * 0.82 + dy * k * 0.03;
-          p.x += p.vx; p.y += p.vy;
-          p.rot *= 0.97;
-          p.wobble += p.wobbleSpeed * 0.25;
-          if (dist < 1.4){ p.x = p.target.x; p.y = p.target.y; p.vx = p.vy = 0; p.arriveT += dt; }
-        } else {
-          if (forming) { p.alpha *= 0.985; }
-          p.wobble += p.wobbleSpeed;
-          p.x += Math.sin(p.wobble)*0.35 + (p.vx||0);
-          p.y += (p.vy||0) + rand(0.5, 1.2);
-          p.rot += p.rotSpeed;
-          if (p.y > stage.clientHeight + 22) { p.y = -22; p.x = rand(0, stage.clientWidth); }
-        }
-        drawPetal(p);
-      }
-
-      requestAnimationFrame(tick);
+    // init
+    fit();
+    seedPetals();
+    buildTextTargets();
+    orchestrate();
+    requestAnimationFrame(tick);
     }
 
     function seedPetals(){
@@ -344,14 +186,14 @@
 
     // Orchestrate timeline
     function orchestrate(){
-      
       formed = false; forming = false;
-      // after a short moment, start forming into the phrase
+      // start forming after a pause so enough petals exist
       setTimeout(() => {
         assignTargets();
-        // show overlay soft glow text as it forms (assist readability)
-        // overlay disabled; just mark formed later
         setTimeout(()=>{ formed = true; }, 4500);
+      }, 2500);
+      setTimeout(() => { PANEL.classList.add('fade-in'); ANSWER.focus(); }, 5200);
+    }, 4500);
       }, 3200);
       // reveal the panel slightly later
       setTimeout(() => {
@@ -406,9 +248,24 @@
     async function toggleMusic(){
       try{
         if (!audioOn){
-          if (BGM.querySelector('source')){
-            await BGM.play();
-          } else {
+          // ensure a user gesture triggered this
+          if (BGM.readyState < 2){ BGM.load(); }
+          BGM.currentTime = 0;
+          await BGM.play();
+          audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
+          MUSIC_BTN.textContent = 'Выключить музыку';
+        } else {
+          if (!BGM.paused) BGM.pause();
+          if (audioCtx && audioCtx.state !== 'closed') { audioCtx.suspend(); }
+          audioOn = false; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: выкл';
+          MUSIC_BTN.textContent = 'Включить музыку';
+        }
+      }catch(err){
+        console.warn('Audio error', err);
+        // fallback to WebAudio pad after a gesture
+        if (!audioCtx) { startWebAudioLofi(); audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл'; MUSIC_BTN.textContent = 'Выключить музыку'; }
+      }
+    } else {
             startWebAudioLofi();
           }
           audioOn = true; MUSIC_STATE.innerHTML = '<span class="dot"></span> музыка: вкл';
@@ -436,6 +293,10 @@
       }
     }
     MUSIC_BTN.addEventListener('click', toggleMusic);
+    // iOS unlock
+    window.addEventListener('touchstart', () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }, { once:true });
 
     // Minimal WebAudio fallback: gentle lo-fi pad
     let audioCtx; let gNodes=[];
